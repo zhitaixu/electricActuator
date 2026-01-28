@@ -3,11 +3,11 @@
 
 /* ===== DRV8313 ===== */
 static const int PIN_IN1    = 9;
-static const int PIN_EN1    = 10;   // PWM
+static const int PIN_EN1    = 10;   // EN (enable)
 static const int PIN_IN2    = 11;
-static const int PIN_EN2    = 12;   // PWM
+static const int PIN_EN2    = 12;   // EN (enable)
 static const int PIN_IN3    = 13;
-static const int PIN_EN3    = 14;   // PWM
+static const int PIN_EN3    = 14;   // EN (enable)
 static const int PIN_NSLEEP = 21;
 static const int PIN_NRESET = 47;
 static const int PIN_NFAULT = 42;

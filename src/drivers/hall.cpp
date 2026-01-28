@@ -1,12 +1,13 @@
 #include "drivers/hall.h"
+#include "config_calib.h"
 
 static int _u,_v,_w;
 
 void HallReader::begin(int pinU, int pinV, int pinW){
   _u=pinU; _v=pinV; _w=pinW;
-  pinMode(_u, INPUT);
-  pinMode(_v, INPUT);
-  pinMode(_w, INPUT);
+  pinMode(_u, HALL_USE_PULLUP ? INPUT_PULLUP : INPUT);
+  pinMode(_v, HALL_USE_PULLUP ? INPUT_PULLUP : INPUT);
+  pinMode(_w, HALL_USE_PULLUP ? INPUT_PULLUP : INPUT);
 }
 
 HallSample HallReader::read(){

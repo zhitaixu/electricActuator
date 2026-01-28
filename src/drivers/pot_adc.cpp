@@ -1,5 +1,5 @@
 #include "drivers/pot_adc.h"
-#include "../../include/config_calib.h"
+#include "config_calib.h"
 
 void PotAdc::begin(int pinAdc){
   _pin = pinAdc;

@@ -1,7 +1,7 @@
 #pragma once
 #include <Arduino.h>
 #include <WebServer.h>
-#include "../app/control.h"
+#include "app/control.h"
 
 class ApWeb {
 public:

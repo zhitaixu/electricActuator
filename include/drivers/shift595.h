@@ -5,6 +5,7 @@ class Shift595 {
 public:
   void begin(int ser, int srclk, int rclk, int oe);
   void setLed(int ledIndex1to19, bool on); // LED1..LED19
+  void setDigit(int digitIndex0left1right, int value); // 0..9, other = blank
   void apply();
 
   void setAllOff();
