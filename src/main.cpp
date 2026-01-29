@@ -141,6 +141,11 @@ void loop(){
     bool evPlus = keys.pressedPlus();
     bool evMinus = keys.pressedMinus();
     bool evOk = keys.pressedOk();
+    bool vMinus=false, vPlus=false, vOk=false;
+    ctl.consumeInjected(vMinus, vPlus, vOk);
+    if(vPlus) evPlus = true;
+    if(vMinus) evMinus = true;
+    if(vOk) evOk = true;
     bool anyKey = evPlus || evMinus || evOk;
     if(anyKey){
       if(!displayOn){

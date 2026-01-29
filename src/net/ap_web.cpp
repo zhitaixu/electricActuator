@@ -2,6 +2,7 @@
 #include "web_assets.h"
 #include "config_build.h"
 #include <WiFi.h>
+#include <Update.h>
 
 void ApWeb::begin(Control* ctl){
   _ctl = ctl;
@@ -87,6 +88,37 @@ void ApWeb::begin(Control* ctl){
   _srv.on("/api/hall_seq", HTTP_GET, [&](){
     if(!_ctl){ _srv.send(500,"text/plain",""); return; }
     _srv.send(200,"text/plain", _ctl->hallSeq());
+  });
+
+  _srv.on("/api/key", HTTP_GET, [&](){
+    if(!_ctl){ _srv.send(500,"text/plain","no ctl"); return; }
+    bool km = _srv.hasArg("minus") && _srv.arg("minus").toInt()!=0;
+    bool kp = _srv.hasArg("plus") && _srv.arg("plus").toInt()!=0;
+    bool ko = _srv.hasArg("ok") && _srv.arg("ok").toInt()!=0;
+    _ctl->injectKeyPress(km, kp, ko);
+    _srv.send(200,"text/plain","ok");
+  });
+
+  _srv.on("/api/ota", HTTP_POST, [&](){
+    bool ok = !Update.hasError();
+    _srv.send(200, "text/plain", ok ? "OK" : "FAIL");
+    delay(300);
+    if(ok) ESP.restart();
+  }, [&](){
+    HTTPUpload& upload = _srv.upload();
+    if(upload.status == UPLOAD_FILE_START){
+      if(!Update.begin(UPDATE_SIZE_UNKNOWN)){
+        Update.printError(Serial);
+      }
+    }else if(upload.status == UPLOAD_FILE_WRITE){
+      if(Update.write(upload.buf, upload.currentSize) != upload.currentSize){
+        Update.printError(Serial);
+      }
+    }else if(upload.status == UPLOAD_FILE_END){
+      if(!Update.end(true)){
+        Update.printError(Serial);
+      }
+    }
   });
 
   _srv.on("/api/move", HTTP_GET, [&](){

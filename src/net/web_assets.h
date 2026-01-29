@@ -33,7 +33,7 @@ static const char INDEX_HTML[] PROGMEM = R"HTML(
 <div class="wrap">
   <div class="row">
     <div class="card">
-      <h1>Electric Actuator <span class="tag" id="ver">--</span></h1>
+      <h1>Electric Actuator <span class="tag" id="ver">--</span> <span class="tag">OTA TEST</span></h1>
       <div class="kv">
         <span>Enabled</span><b id="en">--</b>
         <span>Running</span><b id="run">--</b>
@@ -94,6 +94,11 @@ static const char INDEX_HTML[] PROGMEM = R"HTML(
 
     <div class="card">
       <h1>LED / Keys</h1>
+      <div class="btns">
+        <button onclick="api('/api/key?minus=1')">Key -</button>
+        <button onclick="api('/api/key?plus=1')">Key +</button>
+        <button onclick="api('/api/key?ok=1')">Key OK</button>
+      </div>
       <div class="kv">
         <span>LED RUN</span><b id="lrun">--</b>
         <span>LED VALVE</span><b id="lval">--</b>
@@ -107,6 +112,17 @@ static const char INDEX_HTML[] PROGMEM = R"HTML(
         <span>Press +</span><b id="pplus">--</b>
         <span>Press OK</span><b id="pok">--</b>
       </div>
+    </div>
+
+    <div class="card">
+      <h1>OTA Upgrade</h1>
+      <div style="color:var(--muted);font-size:12px;line-height:1.5;margin-bottom:8px;">
+        选择固件 bin 上传，完成后设备自动重启。
+      </div>
+      <form id="otaForm" method="POST" action="/api/ota" enctype="multipart/form-data">
+        <input type="file" name="update" accept=".bin"/>
+        <button class="primary" type="submit">Upload</button>
+      </form>
     </div>
   </div>
 </div>

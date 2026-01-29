@@ -51,6 +51,8 @@ public:
                   bool ledRun, bool ledValve, bool ledKvs, bool ledTemp, bool ledPct);
   void setKeyState(bool downMinus, bool downPlus, bool downOk,
                    bool pressMinus, bool pressPlus, bool pressOk);
+  void injectKeyPress(bool minus, bool plus, bool ok);
+  void consumeInjected(bool &minus, bool &plus, bool &ok);
   void tick();
   ControlStatus status() const { return _st; }
 
@@ -73,6 +75,7 @@ private:
   uint8_t _capSeq[16]{};
   uint8_t _capLen=0;
   char _hallSeqStr[64]{};
+  bool _vkMinus=false, _vkPlus=false, _vkOk=false;
 
   float computeDuty(float errDeg);
 };

@@ -129,6 +129,19 @@ void Control::setKeyState(bool downMinus, bool downPlus, bool downOk,
   _st.keyPressOk = pressOk;
 }
 
+void Control::injectKeyPress(bool minus, bool plus, bool ok){
+  _vkMinus = _vkMinus || minus;
+  _vkPlus = _vkPlus || plus;
+  _vkOk = _vkOk || ok;
+}
+
+void Control::consumeInjected(bool &minus, bool &plus, bool &ok){
+  minus = _vkMinus;
+  plus = _vkPlus;
+  ok = _vkOk;
+  _vkMinus = _vkPlus = _vkOk = false;
+}
+
 float Control::computeDuty(float errDeg){
   float duty = fabs(errDeg) * KP_DUTY_PER_DEG;
   if(duty < DUTY_MIN) duty = DUTY_MIN;
