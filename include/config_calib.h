@@ -21,5 +21,5 @@ static const float KICK_DUTY = 0.28f;
 static const int DETECT_RETRY_MS = 600;
 static const bool USE_POT_FEEDBACK = true;
 static const bool HALL_USE_PULLUP = false;
-static const uint8_t DEFAULT_HALL_MAP = 0; // Map 0 + Dir - = CCW (smooth)
-static const int DEFAULT_DIR_SIGN = -1;     // -1 means angle increases in CCW
+static const uint8_t DEFAULT_HALL_MAP = 0; // Map 0 + Dir + = CCW (smooth)
+static const int DEFAULT_DIR_SIGN = +1;     // +1 means angle increases in CCW

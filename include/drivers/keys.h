@@ -22,5 +22,5 @@ private:
   int _m=-1,_p=-1,_o=-1;
   KeyState _raw{}, _stable{}, _prevStable{};
   uint32_t _tChange=0;
-  static const int DEBOUNCE_MS = 30;
+  static const int DEBOUNCE_MS = 80;
 };

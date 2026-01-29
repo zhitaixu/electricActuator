@@ -259,7 +259,15 @@ void Control::tick(){
     return;
   }
 
-  int dir = (err > 0) ? _st.dirSign : -_st.dirSign;
+  int dir = (err > 0) ? +1 : -1;
+  // 自动切换顺逆时针对应的映射/方向
+  if(dir > 0){
+    if(_st.hallMap != 0) setHallMap(0);
+    _st.dirSign = +1;
+  }else{
+    if(_st.hallMap != 3) setHallMap(3);
+    _st.dirSign = -1;
+  }
   float duty = computeDuty(err);
 
   if(!_hall->isValid(hs.code) || (int)(millis() - _tHallChange) > HALL_STUCK_MS){

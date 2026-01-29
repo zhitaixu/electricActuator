@@ -55,10 +55,10 @@ void ApWeb::begin(Control* ctl){
     String mode = _srv.hasArg("mode") ? _srv.arg("mode") : "";
     if(mode == "ccw"){
       _ctl->setHallMap(0);
-      _ctl->setDirSign(-1);
+      _ctl->setDirSign(+1);
     }else if(mode == "cw"){
       _ctl->setHallMap(3);
-      _ctl->setDirSign(+1);
+      _ctl->setDirSign(-1);
     }
     _srv.send(200,"text/plain","ok");
   });

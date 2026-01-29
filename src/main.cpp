@@ -66,6 +66,7 @@ void loop(){
   static int kvsPct = 0;
   static bool keyEvMinus=false, keyEvPlus=false, keyEvOk=false;
   static uint32_t tKeyEv=0;
+  static uint32_t tKeyGuard=0;
 
   uint32_t now = millis();
 
@@ -156,6 +157,10 @@ void loop(){
       tLastAct = now;
     }
 
+    if((int)(now - tKeyGuard) < 120){
+      evPlus = evMinus = evOk = false;
+    }
+
     if(evOk){
       if(!adjustMode){
         adjustMode = true;
@@ -184,6 +189,7 @@ void loop(){
       keyEvMinus = evMinus;
       keyEvOk = evOk;
       tKeyEv = now;
+      tKeyGuard = now;
     }
   }
 

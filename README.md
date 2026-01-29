@@ -1,313 +1,192 @@
-# Electric Actuator (ESP32-S3 + DRV8313) — README v2
+# Electric Actuator (ESP32-S3 + DRV8313)
 
-## 1. 项目简介
+## 1. 项目概述
 
-本项目为电动执行器样机/产品化原型，主控为 **ESP32-S3-WROOM-1-R8N8**，三相无刷电机驱动为 **TI DRV8313PWPR**。
-位置反馈使用 **电位器 ADC**，电机端集成 **三路霍尔 Hall(U/V/W)**，用于 **Hall 闭环换相**（相比纯开环更稳定、起步成功率更高、抖动更少）。
-交互包括 **19 颗离散 LED（断码屏风格）**、**3 个按键（- / + / OK）**，并提供 **SoftAP + Web UI** 用于调试与控制。
+本项目是电动执行器样机的产品化原型，主控为 **ESP32-S3-WROOM-1-R8N8**，三相无刷电机驱动为 **TI DRV8313**。  
+位置反馈使用 **电位器 ADC**，电机端集成 **三路 Hall(U/V/W)**，实现 **Hall 闭环换相**，并基于电位器角度闭环停位。
+
+交互包括 **19 颗离散 LED（7 段数码 + 状态灯）**、**3 个按键（- / + / OK）**，并提供 **SoftAP + Web UI** 用于运行控制与 OTA 升级。
 
 ---
 
-## 2. 产品功能
+## 2. 运行功能（当前实现）
 
 ### 2.1 基本行为
 
-* 机械量程：0°–93°（物理硬限位），**实际业务按 0°–90°理解/显示/控制**
-* 休眠策略：无操作 1 分钟息屏；息屏时任意按键唤醒显示
-* 按键逻辑（规划）
+- 机械量程：0°~93°（硬限位），业务显示/控制也以此为准  
+- 1 分钟无操作熄屏，任意按键唤醒  
+- 温度无传感器，固定显示 25  
 
-  1. 唤醒后按 **OK** 进入 KVS 调整（KVS 图标闪烁）
-  2. 按 **- / +** 递减/递增
-  3. 再按 **OK** 确认保存（样机阶段可只保存到 RAM；产品化阶段保存到 NVS）
+### 2.2 电机控制链路
 
-### 2.2 电机控制（从样机到产品化的路线）
-
-* 阶段 0：开环 6-step（用于硬件联调、自检、验证相序/线序）
-* **阶段 1：Hall 闭环换相（推荐写入产品功能）**
-
-  * Hall(U/V/W) 解析为 6 个有效状态（001/010/011/100/101/110）
-  * Hall 状态变化触发换相（commutation），显著提升低速稳定性
-  * 启动策略可采用“开环推一下 → 捕获 Hall → 切闭环”
-* 阶段 2：角度闭环（产品化目标）
-
-  * Hall 负责“怎么转得顺”，电位器负责“转到哪里停”
-  * 目标角度 → 误差 → 输出转速/占空比 → Hall 闭环换相执行
-  * 接近 93°硬限位区降速/停机保护
+- **Hall 闭环换相**：Hall 6 个有效状态触发 commutation  
+- **电位器闭环**：根据目标角度与当前角度误差，输出转速/占空比  
+- **方向规则**：  
+  - 逆时针（CCW）→ 角度增加  
+  - 顺时针（CW）→ 角度减小  
 
 ---
 
-## 3. 硬件资源
+## 3. Hall 顺序与映射（已验证顺滑）
 
-### 3.1 供电与下载
+顺时针手拨 Hall 序列（连续变化）：
 
-* 外部可调电源输入（12V 侧为主功率供电）
-* 板上 DC-DC：12V → 3.3V（MCU/逻辑）
-* UART0 烧录
+- `001-011-010-110-100-101`
 
-### 3.2 DRV8313（三相驱动）GPIO
+当前已验证可用方向映射：
 
-* `IN1 = IO9`
-* `EN1(PWM) = IO10`
-* `IN2 = IO11`
-* `EN2(PWM) = IO12`
-* `IN3 = IO13`
-* `EN3(PWM) = IO14`
-* `nSLEEP = IO21`
-* `nRESET = IO47`
-* `nFAULT = IO42`（低=故障）
+- `Map 0 + Dir +` → 逆时针（顺滑）
+- `Map 3 + Dir -` → 顺时针（顺滑）
 
-### 3.3 Hall（三路）GPIO
+默认配置：
 
-* `HALL_U = IO37`
-* `HALL_V = IO38`
-* `HALL_W = IO39`
-* Hall 供电 3.3V，上拉（外部上拉即可，避免再开内部上拉造成不必要静态电流）
+- `DEFAULT_HALL_MAP=0`
+- `DEFAULT_DIR_SIGN=+1`
 
-### 3.4 电位器 ADC
-
-* `POT_ADC = IO20`
-* 电位器两端：3.3V / GND（不分压到 1V）
-* 样机标定参考：
-
-  * 0° ≈ **3900**
-  * 93° ≈ **2630**
-* 推荐抗噪电路：
-
-  * 滑臂串联 1k–4.7k（推荐 2.2k）
-  * ADC 对地 100nF（低通滤波）
-  * 走线远离 U/V/W 与功率回流
-
-### 3.5 按键 GPIO（外部上拉到 3.3V）
-
-* `KEY_MINUS = IO15`
-* `KEY_PLUS  = IO16`
-* `KEY_OK    = IO17`
-
-> 外部上拉时，软件侧不建议启用内部上拉；逻辑不会冲突，但会增加静态电流，且排查时容易混乱。
+运行时自动根据目标方向切换映射/方向，保证顺/逆时针都顺滑。
 
 ---
 
-## 4. 相序与相线映射（已验证可转）
+## 4. 按键与 LED 行为
 
-这是“能不能转”的核心真源。已确认可用组合如下：
+### 4.1 按键
 
-* `phase_map = 1-2-3（可用）`
-* `invert = 0（可用）`
+- **OK**：进入/确认 KVS 调整  
+- **+ / -**：KVS 模式下增减开阀比例  
+- 确认后开始向目标角度转动（KVS → 目标角度）
 
-驱动通道与相定义：
+### 4.2 LED 逻辑
 
-* `ph=1 → (IN1, EN1) → DRV 通道1 → OUT1`
-* `ph=2 → (IN2, EN2) → DRV 通道2 → OUT2`
-* `ph=3 → (IN3, EN3) → DRV 通道3 → OUT3`
+- **LED1**：RUN（运行中闪烁，熄灭表示未转动）  
+- **LED2**：VALVE（开阀角度）  
+- **LED3**：KVS（最大 KVS 设定）  
+- **LED4**：TEMP（温度）  
+- **LED5**：PCT（百分比）  
 
-电机三相线对应：
+显示规则：
 
-* **U = phase1**
-* **V = phase2**
-* **W = phase3**
-
-> 如果后续改板/改线导致不转：第一优先检查这张映射表是否被破坏；第二才去调软件参数。
-
----
-
-## 5. LED 显示系统
-
-### 5.1 19 颗 LED 的逻辑含义
-
-* **LED1~LED5：状态图标**
-
-  * LED1：RUN（运行中）
-  * LED2：VALVE（开阀角度）
-  * LED3：KVS（最大KVS设定）
-  * LED4：TEMP（温度）
-  * LED5：PCT（百分比）
-* **LED6~LED12：左侧七段**
-* **LED13~LED19：右侧七段**
-
-### 5.2 74HC595 + ULN2803（最终映射）
-
-说明：每片 595 只用 QB~QH（QA 不用），且为布线做了倒序映射。
-
-* **595#1：图标 5 颗（LED1~LED5）**
-
-  * 从 `QF → QB` 递增对应 `LED1 → LED5`
-  * `QF=LED1, QE=LED2, QD=LED3, QC=LED4, QB=LED5`
-
-* **595#2：左侧七段（LED6~LED12）**
-
-  * 从 `QH → QB` 递增对应 `LED6 → LED12`
-  * `QH=LED6, QG=LED7, QF=LED8, QE=LED9, QD=LED10, QC=LED11, QB=LED12`
-
-* **595#3：右侧七段（LED13~LED19）**
-
-  * 从 `QH → QB` 递增对应 `LED13 → LED19`
-  * `QH=LED13, QG=LED14, QF=LED15, QE=LED16, QD=LED17, QC=LED18, QB=LED19`
-
-### 5.3 七段段位定义（用于 0~9 段码表）
-
-左七段（LED6~12）段位布局：
-
-* 顶：LED6
-* 左上/右上：LED7 / LED8
-* 中：LED9
-* 左下/右下：LED10 / LED11
-* 底：LED12
-
-右七段（LED13~19）同理：
-
-* 顶：LED13
-* 左上/右上：LED14 / LED15
-* 中：LED16
-* 左下/右下：LED17 / LED18
-* 底：LED19
+- 正常显示：LED2 与 LED4 轮显  
+- KVS 调整：LED2 与 LED3 同步闪烁  
+- 7 段数码：  
+  - VALVE 页面显示当前角度  
+  - TEMP 页面固定显示 25  
+  - KVS 模式显示 KVS 百分比  
 
 ---
 
-## 6. SoftAP + Web UI
+## 5. SoftAP + Web UI
 
-* SoftAP：
+### 5.1 SoftAP
 
-  * SSID：`test111111`
-  * 密码：无
-* Web 页面（规划/实现方向）：
+- SSID：`test111111`  
+- 密码：无  
 
-  * 状态：角度（ADC/deg）、Hall 状态、nFAULT、运行模式
-  * 控制：Enable/Disable、电机转动、占空比/速度、目标角度
-  * 标定：记录 0°/93°、保存、恢复默认
-  * 调试：日志、实时传感器刷新、故障提示
+### 5.2 运行页面（最终版）
 
-### 6.1 OTA 升级（SoftAP 上传 bin）
+Web UI 提供：
 
-* 连接设备 SoftAP（SSID: `test111111`）
-* 打开 Web UI，进入 **OTA Upgrade** 卡片
-* 选择编译生成的 `.bin` 文件上传
-* 上传成功后设备自动重启并切换到新固件
+- 目标角度 / 速度 / 扭矩（占空比）设置  
+- 关键状态（角度/目标/速度/扭矩/Hall/nFAULT 等）  
+- LED 段码显示模拟  
+- 按键模拟（- / + / OK）  
+- 预设方向按钮用于调试  
 
-> 需要 OTA 分区表：已启用 `partitions.csv`（含 ota_0/ota_1）
+### 5.3 OTA 升级（SoftAP 上传 bin）
 
----
+1. 连接设备 SoftAP（SSID：`test111111`）  
+2. 打开 Web UI，进入 **OTA Upgrade**  
+3. 选择编译生成的 `firmware.bin` 上传  
+4. 上传成功后设备自动重启并切换到新固件  
 
-## 7. 标定数据持久化与固件升级不丢
-
-* 默认值写在 `config_calib.h`（第一次启动就可运行）
-* 若 NVS 中存在有效标定值，则优先使用 NVS
-* 写入策略：
-
-  * 仅在用户“确认保存”时写一次（避免频繁写）
-  * 写后校验（范围/CRC）
-* 升级不丢的前提：
-
-  * 升级仅覆盖 App 分区，不做整片 Flash erase
-  * NVS 位于独立分区
+> 已启用 `partitions.csv`（包含 `ota_0/ota_1`）。
 
 ---
 
-## 8. 软件工程目录结构（规划）
+## 6. 硬件资源（关键 GPIO）
+
+### DRV8313
+
+- `IN1 = IO9`  
+- `EN1(PWM) = IO10`  
+- `IN2 = IO11`  
+- `EN2(PWM) = IO12`  
+- `IN3 = IO13`  
+- `EN3(PWM) = IO14`  
+- `nSLEEP = IO21`  
+- `nRESET = IO47`  
+- `nFAULT = IO42`（低=故障）  
+
+### Hall
+
+- `HALL_U = IO37`  
+- `HALL_V = IO38`  
+- `HALL_W = IO39`  
+- 外部上拉 3.3V（不建议再开内部上拉）  
+
+### 电位器 ADC
+
+- `POT_ADC = IO20`  
+- 标定参考：  
+  - 0° ≈ 3900  
+  - 93° ≈ 2630  
+
+### 按键
+
+- `KEY_MINUS = IO15`  
+- `KEY_PLUS  = IO16`  
+- `KEY_OK    = IO17`  
+
+---
+
+## 7. 工程目录结构（实际）
 
 ```text
 (project root)
   platformio.ini
+  partitions.csv
   /include
-    config_pins.h        # 所有GPIO定义（唯一真源）
-    config_calib.h       # 标定参数：ADC->角度、限位、滤波参数（含默认值）
-    config_build.h       # 版本号/编译信息（日志/网页显示/追溯固件）
-
-  /src
-    main.cpp             # 启动、调度、状态机入口
-
+    config_pins.h
+    config_calib.h
+    config_build.h
     /drivers
-      drv8313_6step.cpp  # DRV8313驱动（开环 + Hall闭环接口）
-      drv8313_6step.h
-      hall.cpp           # 霍尔采样/去抖/状态解析（输出 hall_state）
+      drv8313_hall.h
       hall.h
-      pot_adc.cpp        # ADC采样+滤波+角度映射
       pot_adc.h
-      shift595.cpp       # 74HC595底层（shift out + latch + OE）
       shift595.h
-      keys.cpp           # 按键扫描+去抖+事件输出
       keys.h
 
+  /src
+    main.cpp
+
+    /drivers
+      drv8313_hall.cpp
+      hall.cpp
+      pot_adc.cpp
+      shift595.cpp
+      keys.cpp
+
     /app
-      state_machine.cpp  # 状态机：休眠/显示/设置/运行/故障
-      state_machine.h
-      ui_led.cpp         # 逻辑UI -> LED位图（含段码表）
-      ui_led.h
-      control.cpp        # 控制策略：开环/闭环换相/角度闭环（逐步演进）
+      control.cpp
       control.h
+      ui_led.cpp
+      ui_led.h
 
     /net
-      ap_web.cpp         # SoftAP启动、HTTP路由
+      ap_web.cpp
       ap_web.h
-      web_assets.h       # 内嵌HTML/CSS/JS（样机阶段内嵌最省事）
+      web_assets.h
 
     /utils
-      logger.cpp         # 统一日志（带时间戳/模块名/级别）
-      timebase.cpp       # 统一时间基与节拍（避免 delay 堵塞）
+      logger.h
+      timebase.h
 ```
 
 ---
 
-## 12. 实测映射修正（清晰版）
+## 8. 控制原理（简述）
 
-* `Map 0 + Dir -` → 逆时针（顺滑）
-* `Map 3 + Dir +` → 顺时针（顺滑）
-* 默认：`DEFAULT_HALL_MAP=0`、`DEFAULT_DIR_SIGN=-1`
+- **Hall 闭环换相**：Hall 6 个有效码触发 6-step commutation  
+- **方向反转原理**：同一 Hall 序列下更换映射或反向相序，可实现反转  
+- **位置闭环**：电位器角度作为反馈，达到目标角度后停止  
+- **抖动本质**：Hall 顺序与换相表不匹配会导致卡顿/抖动/发热  
 
----
-
-## 13. LED 与按键当前实现（与需求对齐）
-
-### 13.1 LED
-
-* LED1：RUN（运行中闪烁，未点亮=未转动）
-* LED2：VALVE（开阀角度页面）
-* LED3：KVS（KVS 调整中闪烁）
-* LED4：TEMP（温度页面）
-* LED5：PCT（预留）
-
-显示规则：
-* 正常显示时 **LED2 与 LED4 轮显**
-* 进入 KVS 调整模式时 **LED2 与 LED3 同步闪烁**
-
-### 13.2 按键
-
-* OK：进入/确认 KVS 调整
-* + / -：在 KVS 模式下增减开阀比例
-* 确认后：开始朝目标角度转动（KVS → 目标角度）
-* 1 分钟无操作息屏，任意按键唤醒
-
----
-
-## 14. 七段数码显示规则（当前实现）
-
-* 正常显示：
-  * VALVE 页面显示 **当前角度**
-  * TEMP 页面固定显示 **25**
-* KVS 调整模式：显示 **KVS 百分比**
-
-
----
-
-## 10. 实测 Hall 顺序与可用方向（已验证）
-
-顺时针手拨捕获序列（连续变化点）：
-
-* `001-011-010-110-100-101`
-
-对应软件映射/方向（已验证顺滑）：
-
-* `Map 0 + Dir +` → 逆时针（顺滑）
-* `Map 3 + Dir -` → 顺时针（顺滑）
-
-已将默认值设置为：`DEFAULT_HALL_MAP=0`、`DEFAULT_DIR_SIGN=+1`
-
----
-
-## 11. 控制原理说明（简版）
-
-* **Hall 闭环换相**：读取 Hall(U/V/W) 的 6 个有效码（001/010/011/100/101/110），每次码变化触发一次 6-step 换相。
-* **换相表决定转向**：相同 Hall 序列下，调换映射或取反方向，会让电机反转。
-* **抖动的本质原因**：Hall 顺序与电机相线/换相表不匹配，会出现“卡住/抖动/发热/不转”。
-* **调速**：本版本用 PWM 占空比控制相电流大小，从而改变速度；用 Hall 保证相位正确。
-
----
